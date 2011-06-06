@@ -6,33 +6,47 @@
 #
 # == Examples
 #   This command does blah blah blah.
-#     ruby_cl_skeleton foo.txt
+#     extractKeggAnnotations.rb foo.txt
 #
 #   Other examples:
-#     ruby_cl_skeleton -q bar.doc
-#     ruby_cl_skeleton --verbose foo.html
+#     extractKeggAnnotations.rb -q bar.doc
+#     extractKeggAnnotations.rb --verbose foo.html
 #
 # == Usage 
-#   ruby_cl_skeleton [options] source_file
+#   extractKeggAnnotations.rb [-hvqkegV] source_file
 #
-#   For help use: ruby_cl_skeleton -h
+#   For help use: extractKeggAnnotations.rb -h
 #
 # == Options
 #   -h, --help          Displays help message
-#   -v, --version       Display the version, then exit
+#   -V, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
-#   -V, --verbose       Verbose output
-#   TO DO - add additional options
+#   -v, --verbose       Verbose output
+#   -k, --ko_number     Search for ko numbers
+#   -e, --ec_number     Search for EC numbers
+#   -g, --gene          Search for KEGG gene annotations
+#
 #
 # == Author
-#   YourName
-#
+#   Connor Skennerton
 # == Copyright
-#   Copyright (c) 2007 YourName. Licensed under the MIT License:
-#   http://www.opensource.org/licenses/mit-license.php
+#    
+#    Copyright (c) 2011 Connor Skennerton 
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# TO DO - replace all ruby_cl_skeleton with your app name
+# TO DO - replace all extractKeggAnnotations.rb with your app name
 # TO DO - replace all YourName with your actual name
 # TO DO - update Synopsis, Examples, etc
 # TO DO - change license if necessary
@@ -45,7 +59,7 @@ require 'ostruct'
 require 'date'
 
 
-class App
+class ExtractKeggAnotations
   VERSION = '0.0.1'
   
   attr_reader :options
@@ -58,13 +72,16 @@ class App
     @options = OpenStruct.new
     @options.verbose = false
     @options.quiet = false
+    @options.ko = false
+    @options.gene = false
+    @options.ec = false
     # TO DO - add additional defaults
   end
 
   # Parse options, check arguments, then process the command
   def run
         
-    if parsed_options? && arguments_valid? 
+    if parsed_options? 
       
       puts "Start at #{DateTime.now}\
 \
@@ -73,8 +90,13 @@ class App
       output_options if @options.verbose # [Optional]
             
       process_arguments            
-      process_command
-      
+	if @arguments.length == 0
+		process_standard_input
+	else
+      	@arguments.each do |file|
+      		readInputFile(file)
+      	end
+    end
       puts "\
 Finished at #{DateTime.now}" if @options.verbose
       
@@ -90,10 +112,13 @@ Finished at #{DateTime.now}" if @options.verbose
       
       # Specify options
       opts = OptionParser.new 
-      opts.on('-v', '--version')    { output_version ; exit 0 }
+      opts.on('-V', '--version')    { output_version ; exit 0 }
       opts.on('-h', '--help')       { output_help }
-      opts.on('-V', '--verbose')    { @options.verbose = true }  
+      opts.on('-v', '--verbose')    { @options.verbose = true }  
       opts.on('-q', '--quiet')      { @options.quiet = true }
+      opts.on('-e', '--ec_number')  { @options.ec = true}
+      opts.on('-k', '--ko_number')  { @options.ko = true}
+      opts.on('-g', '--gene')       { @options.gene = true}
       # TO DO - add additional options
             
       opts.parse!(@arguments) rescue return false
@@ -104,7 +129,25 @@ Finished at #{DateTime.now}" if @options.verbose
 
     # Performs post-parse processing on options
     def process_options
-      @options.verbose = false if @options.quiet
+    	@options.verbose = false if @options.quiet
+		
+		# make sure that only one of gene, ko or EC is set
+		if @options.ko && @options.ec || @options.gene
+			output_usage
+			exit(1)
+		end
+		if @options.ec && @options.ko || @options.gene
+			output_usage
+			exit(1)
+		end
+		if @options.gene && @options.ko || @options.ec
+			output_usage
+			exit(1)
+		end
+		unless @options.gene || @options.ko || @options.ec
+			output_usage
+			exit(1)
+		end
     end
     
     def output_options
@@ -117,10 +160,10 @@ Finished at #{DateTime.now}" if @options.verbose
     end
 
     # True if required arguments were provided
-    def arguments_valid?
-      # TO DO - implement your real logic here
-      true if @arguments.length == 1 
-    end
+#     def arguments_valid?
+#       # TO DO - implement your real logic here
+#       true if @arguments.length >= 1 
+#     end
     
     # Setup the arguments
     def process_arguments
@@ -145,15 +188,52 @@ Finished at #{DateTime.now}" if @options.verbose
       
       #process_standard_input # [Optional]
     end
-
+	
+	# regexp to find EC numbers
+	def extractEc(line)
+		if (line =~ /EC.*(\d+\.\d+\.\d+\.\d+)/)
+        	puts $1;
+    	end	
+	end
+	
+	# regexp to find KEGG ko numbers
+	def extractKo(line)
+		if (line =~ /(ko\:K\d+)/)
+        	puts $1;
+    	end
+	end
+	
+	# regexp to find KEGG gene identifiers
+	def extractGene(line)
+		if (line =~ /([a-zA-Z]{3}\:\w+_\w+)/)
+        	puts $1;
+    	end
+	end
+	
+	def readInputFile(file)
+		File.open(file, 'r') do |infile|
+            while line = infile.gets
+            	if @options.ec
+                	extractEC(line)
+                elsif @options.gene
+                	extractGene(line)
+                elsif @options.ko
+                	extractKo(line) 
+                end
+            end
+        end
+	end
+	
     def process_standard_input
-      input = @stdin.read      
-      # TO DO - process input
-      
-      # [Optional]
-      # @stdin.each do |line| 
-      #  # TO DO - process each line
-      #end
+       @stdin.each do |line| 
+		if @options.ec
+			extractEC(line)
+		elsif @options.gene
+			extractGene(line)
+		elsif @options.ko
+			extractKo(line) 
+		end
+      end
     end
 end
 
@@ -162,5 +242,5 @@ end
 
 
 # Create and run the application
-app = App.new(ARGV, STDIN)
-app.
+app = ExtractKeggAnotations.new(ARGV, STDIN)
+app.run
