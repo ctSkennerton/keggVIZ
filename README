@@ -1,0 +1,6 @@
+markKeggPayway.rb will take as input the file of EC numbers that you created in the script before ( or a list of KO numbers) and query the KEGG database for the pathway they belong to and download pictures of those pathways.
+
+The -r option will print out a .csv file of all of the pathways with there respective enzymes.
+
+$ markKeggPathway.rb [-ahkrqvV] file_containing_EC_numbers|file_containing_KO_numbers
+
