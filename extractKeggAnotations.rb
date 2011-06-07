@@ -13,7 +13,7 @@
 #     extractKeggAnnotations.rb --verbose foo.html
 #
 # == Usage 
-#   extractKeggAnnotations.rb [-hvqkegV] source_file
+#   extractKeggAnnotations.rb [-hvqV] -k|e|g [source_file]
 #
 #   For help use: extractKeggAnnotations.rb -h
 #
@@ -45,14 +45,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-# TO DO - replace all extractKeggAnnotations.rb with your app name
-# TO DO - replace all YourName with your actual name
-# TO DO - update Synopsis, Examples, etc
-# TO DO - change license if necessary
-
-
-
 require 'optparse' 
 require 'rdoc/usage'
 require 'ostruct'
@@ -68,6 +60,7 @@ class ExtractKeggAnotations
     @arguments = arguments
     @stdin = stdin
     
+    @genes = Hash.new
     # Set defaults
     @options = OpenStruct.new
     @options.verbose = false
@@ -97,6 +90,7 @@ class ExtractKeggAnotations
       		readInputFile(file)
       	end
     end
+    printGenes
       puts "\
 Finished at #{DateTime.now}" if @options.verbose
       
@@ -132,15 +126,18 @@ Finished at #{DateTime.now}" if @options.verbose
     	@options.verbose = false if @options.quiet
 		
 		# make sure that only one of gene, ko or EC is set
-		if @options.ko && @options.ec || @options.gene
+		if @options.ko && (@options.ec || @options.gene)
+			puts "options -k -e -g are mutualy exclusive"
 			output_usage
 			exit(1)
 		end
-		if @options.ec && @options.ko || @options.gene
+		if @options.ec && (@options.ko || @options.gene)
+			puts "options -k -e -g are mutualy exclusive"
 			output_usage
 			exit(1)
 		end
-		if @options.gene && @options.ko || @options.ec
+		if @options.gene && (@options.ko || @options.ec)
+			puts "options -k -e -g are mutualy exclusive"
 			output_usage
 			exit(1)
 		end
@@ -158,12 +155,6 @@ Finished at #{DateTime.now}" if @options.verbose
         puts "  #{name} = #{val}"
       end
     end
-
-    # True if required arguments were provided
-#     def arguments_valid?
-#       # TO DO - implement your real logic here
-#       true if @arguments.length >= 1 
-#     end
     
     # Setup the arguments
     def process_arguments
@@ -183,30 +174,33 @@ Finished at #{DateTime.now}" if @options.verbose
       puts "#{File.basename(__FILE__)} version #{VERSION}"
     end
     
-    def process_command
-      # TO DO - do whatever this app does
-      
-      #process_standard_input # [Optional]
+    def printGenes
+      @genes.each do |k, v|
+      	puts k
+      	end
     end
 	
 	# regexp to find EC numbers
 	def extractEc(line)
-		if (line =~ /EC.*(\d+\.\d+\.\d+\.\d+)/)
-        	puts $1;
+		if (line =~ /EC.*(\d+\.\d+\.\d+\.(\d+|-))/)
+        	#puts $1;
+        	@genes[$1] = 1
     	end	
 	end
 	
 	# regexp to find KEGG ko numbers
 	def extractKo(line)
 		if (line =~ /(ko\:K\d+)/)
-        	puts $1;
+        	#puts $1;
+        	@genes[$1] = 1
     	end
 	end
 	
 	# regexp to find KEGG gene identifiers
 	def extractGene(line)
 		if (line =~ /([a-zA-Z]{3}\:\w+_\w+)/)
-        	puts $1;
+        	#puts $1;
+        	@genes[$1] = 1
     	end
 	end
 	
@@ -214,7 +208,7 @@ Finished at #{DateTime.now}" if @options.verbose
 		File.open(file, 'r') do |infile|
             while line = infile.gets
             	if @options.ec
-                	extractEC(line)
+                	extractEc(line)
                 elsif @options.gene
                 	extractGene(line)
                 elsif @options.ko
@@ -227,7 +221,7 @@ Finished at #{DateTime.now}" if @options.verbose
     def process_standard_input
        @stdin.each do |line| 
 		if @options.ec
-			extractEC(line)
+			extractEc(line)
 		elsif @options.gene
 			extractGene(line)
 		elsif @options.ko
@@ -236,10 +230,6 @@ Finished at #{DateTime.now}" if @options.verbose
       end
     end
 end
-
-
-# TO DO - Add your Modules, Classes, etc
-
 
 # Create and run the application
 app = ExtractKeggAnotations.new(ARGV, STDIN)
